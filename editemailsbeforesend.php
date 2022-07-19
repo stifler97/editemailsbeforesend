@@ -62,6 +62,7 @@ class Editemailsbeforesend extends Module
         Configuration::updateValue('EDITEMAILSBEFORESEND_LIVE_MODE', false);
 
         return parent::install() &&
+            $this->registerHook('actionEmailSendBefore') &&
             $this->registerHook('header') &&
             $this->registerHook('backOfficeHeader');
     }
@@ -214,5 +215,34 @@ class Editemailsbeforesend extends Module
     {
         $this->context->controller->addJS($this->_path.'/views/js/front.js');
         $this->context->controller->addCSS($this->_path.'/views/css/front.css');
+    }
+
+    public function hookActionEmailSendBefore($params)
+    {
+        $params = $params;
+        if($params['template']=='shipped'){
+            $params['templatePath'] = $this->local_path . 'mails';
+            $id_order = $params['templateVars']['{id_order}'];
+            $order = new Order($id_order);
+            $deliveryAddress = new Address($order->id_address_delivery);
+            $invoiceAddress = new Address($order->id_address_delivery);
+            $templateNewVars = [
+                '{delivery_block_html}' => $this->getFormatedAddress($deliveryAddress, '<br />', [
+                    'firstname' => '<span style="font-weight:bold;">%s</span>',
+                    'lastname' => '<span style="font-weight:bold;">%s</span>',
+                ]),
+                '{invoice_block_html}' => $this->getFormatedAddress($invoiceAddress, '<br />', [
+                    'firstname' => '<span style="font-weight:bold;">%s</span>',
+                    'lastname' => '<span style="font-weight:bold;">%s</span>',
+                ]),
+            ];
+            $params['templateVars'] = array_merge($params['templateVars'], $templateNewVars);
+        }
+        $params = $params;
+    }
+
+    private function getFormatedAddress(Address $address, $lineSeparator, $fieldsStyle = [])
+    {
+        return AddressFormat::generateAddress($address, ['avoid' => []], $lineSeparator, ' ', $fieldsStyle);
     }
 }
